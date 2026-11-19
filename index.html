@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV TOU ChargeTracker - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-color: #c9d1d9;
+            --primary-neon: #a370f7;
+            --secondary-neon: #00f2fe;
+            --input-bg: #21262d;
+            --border-color: #30363d;
+            --success: #238636;
+            --danger: #da3637;
+            --warning-neon: #ffdf80;
+            --station-neon: #ff7b72;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-color: var(--bg-color);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .login-box {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px 25px;
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .login-box h2 { margin-bottom: 5px; color: #fff; }
+        .login-box p { font-size: 0.85rem; color: #8b949e; margin-bottom: 20px; }
+
+        .login-btn {
+            width: 100%; padding: 12px;
+            background: linear-gradient(135deg, var(--primary-neon), var(--secondary-neon));
+            border: none; border-radius: 8px; color: #fff; font-size: 1rem;
+            font-weight: bold; cursor: pointer; margin-top: 10px;
+            transition: opacity 0.2s;
+        }
+        .login-btn:hover { opacity: 0.9; }
+        .login-error { color: var(--danger); font-size: 0.85rem; margin-top: 10px; display: none; }
+
+        .main-layout {
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        @media (min-width: 950px) {
+            body { padding: 20px; }
+            .main-layout {
+                display: none;
+                grid-template-columns: 380px 1fr;
+                gap: 20px;
+            }
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            height: fit-content;
+            box-sizing: border-box;
+        }
+
+        @media (min-width: 950px) { .container { padding: 25px; } }
+
+        h2, h3 { margin-top: 0; color: #fff; font-weight: 600; }
+
+        .ev-car-display {
+            width: 100%;
+            height: 160px;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+            background-color: #000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (min-width: 600px) { .ev-car-display { height: 180px; } }
+
+        .ev-car-display img {
+            width: 100%; height: 100%; object-fit: contain;
+            transition: transform 0.5s ease;
+            padding: 4px;
+            box-sizing: border-box;
+        }
+
+        .ev-car-display:hover img { transform: scale(1.05); }
+
+        .ev-car-tag {
+            position: absolute; bottom: 8px; right: 8px;
+            background-color: rgba(13, 17, 23, 0.85); color: var(--secondary-neon);
+            padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;
+            border: 1px solid var(--border-color); letter-spacing: 0.5px;
+        }
+
+        .car-info-card {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 15px;
+            font-size: 0.82rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .car-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .station-finder-card {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        .btn-station-find {
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.15), rgba(163, 112, 247, 0.15));
+            border: 1px solid var(--secondary-neon);
+            color: var(--secondary-neon);
+            padding: 8px 10px;
+            font-size: 0.82rem;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+            box-sizing: border-box;
+            transition: all 0.2s;
+        }
+
+        .btn-station-find:hover {
+            background: var(--secondary-neon);
+            color: #0d1117;
+        }
+
+        .maint-card {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .maint-progress-bg {
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            height: 8px;
+            width: 100%;
+            overflow: hidden;
+            margin: 8px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .maint-progress-bar {
+            background: linear-gradient(90deg, var(--secondary-neon), var(--primary-neon));
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .btn-maint-detail {
+            background-color: transparent;
+            border: 1px solid var(--primary-neon);
+            color: var(--primary-neon);
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+            font-weight: bold;
+        }
+
+        .btn-maint-detail:hover { background-color: var(--primary-neon); color: #fff; }
+
+        .btn-offpeak-cal {
+            background-color: rgba(0, 242, 254, 0.08);
+            border: 1px solid var(--secondary-neon);
+            color: var(--secondary-neon);
+            padding: 8px;
+            font-size: 0.82rem;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 6px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-offpeak-cal:hover { background-color: var(--secondary-neon); color: #0d1117; }
+
+        .form-group { margin-bottom: 12px; text-align: left; }
+        label { display: block; margin-bottom: 6px; font-size: 0.88rem; color: #8b949e; }
+
+        input, select {
+            width: 100%; padding: 12px;
+            background-color: var(--input-bg); border: 1px solid var(--border-color);
+            border-radius: 8px; color: #fff; font-size: 1rem; box-sizing: border-box;
+        }
+
+        input:focus, select:focus { outline: none; border-color: var(--primary-neon); }
+
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+
+        button {
+            padding: 12px; border: none; border-radius: 8px;
+            color: #fff; font-size: 0.95rem; font-weight: bold;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+
+        .btn-calc { background: linear-gradient(135deg, var(--primary-neon), var(--secondary-neon)); }
+        .btn-save { background-color: var(--success); }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        @media (min-width: 600px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 12px;
+            }
+        }
+
+        .stat-card {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px 14px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .stat-card p {
+            margin: 0;
+            font-size: 0.82rem;
+            color: #8b949e;
+            font-weight: 500;
+        }
+
+        .stat-card h4 {
+            margin: 8px 0;
+            font-size: 2.1rem;
+            font-weight: 800;
+            line-height: 1.1;
+            word-break: break-all;
+            text-shadow: none !important;
+        }
+
+        @media (min-width: 600px) {
+            .stat-card h4 {
+                font-size: 1.85rem;
+            }
+        }
+
+        .stat-card.cost h4 { color: var(--secondary-neon); }
+        .stat-card.unit h4 { color: var(--primary-neon); }
+        .stat-card.count h4 { color: var(--warning-neon); }
+
+        .stat-sub-detail {
+            width: 100%;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 10px;
+            margin-top: 6px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: #8b949e;
+        }
+
+        .stat-sub-detail span {
+            background-color: rgba(255, 255, 255, 0.03);
+            padding: 5px 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .stat-sub-detail span strong {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .chart-section-header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+
+        @media (min-width: 600px) {
+            .chart-section-header { flex-direction: row; justify-content: space-between; align-items: center; }
+        }
+
+        .chart-header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        .chart-metric-select {
+            padding: 6px 10px !important; font-size: 0.85rem !important; width: auto !important;
+            background-color: var(--input-bg); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;
+        }
+
+        .chart-controls {
+            display: flex; gap: 3px; background-color: var(--input-bg); padding: 4px;
+            border-radius: 8px; border: 1px solid var(--border-color); width: 100%; box-sizing: border-box;
+        }
+
+        @media (min-width: 600px) { .chart-controls { width: auto; } }
+
+        .btn-toggle-chart {
+            background-color: transparent; color: #8b949e; padding: 6px 16px; font-size: 0.85rem;
+            border-radius: 6px; flex: 1; text-align: center;
+        }
+
+        .btn-toggle-chart.active { background-color: var(--card-bg); color: #fff; border: 1px solid var(--border-color); }
+
+        .chart-wrapper {
+            background-color: var(--input-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 10px; margin-bottom: 25px; box-sizing: border-box; width: 100%;
+        }
+
+        .table-container {
+            overflow-x: auto; 
+            overflow-y: auto; 
+            max-height: 520px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            width: 100%;
+        }
+
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            text-align: left; 
+            font-size: 0.88rem; 
+            min-width: 780px; 
+        }
+
+        th, td { 
+            padding: 10px 12px; 
+            border-bottom: 1px solid var(--border-color); 
+            white-space: nowrap; 
+            vertical-align: middle;
+        }
+
+        th { 
+            color: #fff; 
+            background-color: var(--input-bg); 
+            position: sticky; 
+            top: 0; 
+            z-index: 5; 
+            font-weight: 600;
+        }
+
+        .month-header-row { 
+            background-color: #21262d !important; 
+            color: var(--secondary-neon) !important; 
+            font-weight: bold; 
+        }
+
+        .cost-per-km-badge {
+            background-color: rgba(0, 242, 254, 0.15);
+            color: var(--secondary-neon);
+            padding: 3px 8px; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            font-size: 0.8rem;
+            display: inline-block;
+        }
+
+        .action-btn-group {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-action-edit {
+            background-color: transparent; 
+            color: var(--warning-neon); 
+            border: 1px solid var(--warning-neon);
+            padding: 3px 8px; 
+            font-size: 0.75rem; 
+            border-radius: 4px; 
+            cursor: pointer;
+        }
+
+        .btn-action-delete {
+            background-color: transparent; 
+            color: var(--danger); 
+            border: 1px solid var(--danger);
+            padding: 3px 8px; 
+            font-size: 0.75rem; 
+            border-radius: 4px; 
+            cursor: pointer;
+        }
+
+        .btn-action-edit:hover {
+            background-color: var(--warning-neon);
+            color: #0d1117;
+        }
+
+        .btn-action-delete:hover {
+            background-color: var(--danger);
+            color: #fff;
+        }
+
+        .header-title-area, .history-header-area {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; width: 100%;
+        }
+
+        @media (min-width: 600px) {
+            .header-title-area, .history-header-area { flex-direction: row; justify-content: space-between; align-items: center; }
+        }
+
+        .date-range-wrapper {
+            background-color: var(--input-bg); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 10px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px;
+        }
+
+        @media (min-width: 600px) { .date-range-wrapper { flex-direction: row; align-items: center; justify-content: space-between; } }
+
+        .date-range-inputs { display: flex; gap: 8px; align-items: center; width: 100%; }
+        .date-range-inputs input[type="date"] { padding: 6px; font-size: 0.8rem; }
+
+        .btn-reset-range {
+            background-color: transparent; border: 1px solid var(--border-color); color: #8b949e;
+            padding: 6px 10px; font-size: 0.75rem; border-radius: 6px; white-space: nowrap;
+        }
+
+        .filter-group-header { display: flex; gap: 8px; width: 100%; }
+        @media (min-width: 600px) { .filter-group-header { width: auto; } }
+        .filter-group-header select { padding: 8px; font-size: 0.85rem; flex: 1; background-color: var(--input-bg); color: #fff; border: 1px solid var(--border-color); border-radius: 8px; }
+        @media (min-width: 600px) { .filter-group-header select { flex: none; width: 130px; } }
+
+        .loading-status { font-size: 0.8rem; color: var(--secondary-neon); margin-left: 10px; }
+
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8); z-index: 99; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
+        }
+        .modal-card {
+            background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px;
+            padding: 20px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+        }
+
+        .btn-logout {
+            background-color: transparent; border: 1px solid var(--danger); color: var(--danger);
+            padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; margin-left: 10px; cursor: pointer;
+        }
+        .btn-logout:hover { background-color: var(--danger); color: #fff; }
+
+        .ref-link {
+            color: var(--secondary-neon); text-decoration: none; font-size: 0.8rem;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .ref-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+        <h2>⚡ EV ChargeTracker</h2>
+        <p>กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
+        <div class="form-group">
+            <label for="loginUser">Username:</label>
+            <input type="text" id="loginUser" placeholder="ระบุ Username" required>
+        </div>
+        <div class="form-group">
+            <label for="loginPass">Password:</label>
+            <input type="password" id="loginPass" placeholder="ระบุ Password" required>
+        </div>
+        <button class="login-btn" onclick="handleLogin()">เข้าสู่ระบบ</button>
+        <div class="login-error" id="loginError">Username หรือ Password ไม่ถูกต้อง!</div>
+    </div>
+</div>
+
+<div class="main-layout" id="mainLayout">
+    <!-- 👈 ฝั่งซ้าย: ข้อมูลรถ + ทางลัดหาสถานี + เช็กระยะ + ฟอร์มบันทึก -->
+    <div class="container">
+        <h2>⚡ EV ChargeTracker</h2>
+        
+        <div class="ev-car-display">
+            <img src="EX_2_4_cfdb9ae169.png" alt="Geely EX2 Silver Edition" onerror="this.src='https://storage-dev-geely.object-zta.com/images/EX_2_4_cfdb9ae169.png'">
+            <div class="ev-car-tag">GEELY EX2 • SILVER</div>
+        </div>
+
+        <div class="car-info-card">
+            <div class="car-info-row">
+                <span style="color:#8b949e;">ทะเบียนรถ:</span>
+                <strong style="color:var(--secondary-neon);">ขก 1555 ลพบุรี</strong>
+            </div>
+            <div class="car-info-row">
+                <span style="color:#8b949e;">เลขตัวรถ (VIN):</span>
+                <strong style="color:#fff; font-family:monospace; font-size:0.78rem;">LB3EH1SF2TX056979</strong>
+            </div>
+        </div>
+
+        <div class="station-finder-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size:0.85rem; font-weight:bold; color:#fff;">📍 สถานีชาร์จใกล้เคียง</span>
+                <span style="font-size:0.75rem; color:var(--secondary-neon);">แผนที่สด</span>
+            </div>
+            <a href="https://goo.gl/maps/muKm2hBfaqr83KMp7" target="_blank" class="btn-station-find">
+                ⚡ ค้นหาสถานีใกล้ที่สุด & แผนที่นำทาง ↗
+            </a>
+        </div>
+
+        <div class="maint-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.85rem; font-weight:bold; color:#fff;">🔧 เช็กระยะถัดไป</span>
+                <span style="font-size:0.75rem; color:var(--secondary-neon);" id="maintNextKm">รอบ 5,000 กม.</span>
+            </div>
+            <div class="maint-progress-bg">
+                <div class="maint-progress-bar" id="maintProgressBar"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#8b949e;">
+                <span>ล่าสุด: <strong style="color:#fff;" id="maintCurrentKm">0</strong> กม.</span>
+                <span>เหลืออีก: <strong style="color:var(--warning-neon);" id="maintRemainKm">5,000</strong> กม.</span>
+            </div>
+            <button class="btn-maint-detail" onclick="openMaintModal()">📋 ดูตารางอะไหล่ & ค่าบริการ</button>
+        </div>
+
+        <p style="font-size:0.85rem; color:#8b949e; margin-top:-10px; margin-bottom:15px;">ระบุข้อมูลเพื่อคำนวณและบันทึกประวัติ</p>
+        
+        <div class="form-group">
+            <label for="date">วันที่ชาร์จรถ:</label>
+            <input type="date" id="date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="odometer">เลขไมล์ปัจจุบัน (กม.):</label>
+            <input type="number" id="odometer" placeholder="เช่น 12500" min="0" required oninput="calculateEnergy()">
+        </div>
+
+        <div class="form-group">
+            <label for="chargeLocation">สถานที่ชาร์จ:</label>
+            <select id="chargeLocation" onchange="toggleLocationFields()">
+                <option value="home">🏠 ชาร์จที่บ้าน (Home TOU)</option>
+                <option value="station">⚡ ชาร์จนอกบ้าน / สถานีชาร์จ (Public Station)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="battery">ปริมาณไฟที่ชาร์จ (kWh):</label>
+            <input type="text" inputmode="decimal" id="battery" placeholder="เช่น 30 หรือ 7.19+20.16" required oninput="calculateEnergy()">
+        </div>
+
+        <div id="homeRateBox">
+            <div class="form-group">
+                <label for="period">ช่วงเวลาที่ชาร์จ (อัตรา กฟภ.):</label>
+                <select id="period" onchange="calculateEnergy()">
+                    <option value="2.6369">Off-Peak (2.6369 บาท/หน่วย)</option>
+                    <option value="5.7982">On-Peak (5.7982 บาท/หน่วย)</option>
+                </select>
+                <button type="button" class="btn-offpeak-cal" onclick="openCalModal()">
+                    📅 ตรวจสอบปฏิทิน Off-Peak PEA 2569 ↗
+                </button>
+            </div>
+        </div>
+
+        <div id="stationRateBox" style="display: none;">
+            <div class="form-group">
+                <label for="stationUnitRate">ราคาต่อหน่วยตู้ชาร์จ (บาท/kWh):</label>
+                <input type="number" id="stationUnitRate" placeholder="เช่น 7.5 หรือ 8.5" step="0.01" min="0" oninput="calculateEnergy()">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-calc" onclick="calculateEnergy()">คำนวณ</button>
+            <button class="btn-save" id="btnSave" onclick="saveRecord()">บันทึกผล</button>
+        </div>
+
+        <div id="resultBox" style="margin-top:20px; display:none; border-top:1px dashed var(--border-color); padding-top:15px;">
+            <p style="margin:5px 0; font-size:0.85rem; color:#8b949e;">หน่วยไฟที่ชาร์จ: <span id="resUnit" style="color:#fff;"></span></p>
+            <p style="margin:5px 0; font-size:0.85rem; color:#8b949e;">ระยะวิ่งนับจากครั้งก่อน: <span id="resDistance" style="color:#fff;">-</span></p>
+            <h3 style="margin:5px 0; color:var(--secondary-neon);">สุทธิ: <span id="resTotal">0.00</span> บาท</h3>
+            <div style="margin-top:10px; padding:10px; background-color:var(--input-bg); border-radius:8px; border:1px solid var(--border-color);">
+                <p style="margin:0; font-size:0.85rem; color:#8b949e;">อัตราสิ้นเปลืองรอบนี้:</p>
+                <h4 style="margin:5px 0 0 0; color:var(--warning-neon); font-size:0.95rem;" id="resCostPerKm">-</h4>
+            </div>
+        </div>
+    </div>
+
+    <!-- 👉 ฝั่งขวา: แดชบอร์ดและกราฟ -->
+    <div class="container">
+        <div class="header-title-area">
+            <div>
+                <h3 style="display:inline-block; margin:0;">📊 EV Dashboard</h3>
+                <span id="syncStatus" class="loading-status"></span>
+                <button class="btn-logout" onclick="handleLogout()">ออกจากระบบ</button>
+            </div>
+            <div class="filter-group-header">
+                <select id="filterYear" onchange="onDropdownFilterChange()"></select>
+                <select id="filterMonth" onchange="onDropdownFilterChange()">
+                    <option value="all">แสดงทุกเดือน</option>
+                    <option value="1">มกราคม</option>
+                    <option value="2">กุมภาพันธ์</option>
+                    <option value="3">มีนาคม</option>
+                    <option value="4">เมษายน</option>
+                    <option value="5">พฤษภาคม</option>
+                    <option value="6">มิถุนายน</option>
+                    <option value="7">กรกฎาคม</option>
+                    <option value="8">สิงหาคม</option>
+                    <option value="9">กันยายน</option>
+                    <option value="10">ตุลาคม</option>
+                    <option value="11">พฤศจิกายน</option>
+                    <option value="12">ธันวาคม</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="date-range-wrapper">
+            <span style="font-size:0.8rem; color:#8b949e;">กำหนดช่วงเวลาค้นหา:</span>
+            <div class="date-range-inputs">
+                <input type="date" id="startDate" onchange="loadDashboard()">
+                <span style="font-size:0.8rem; color:#8b949e;">ถึง</span>
+                <input type="date" id="endDate" onchange="loadDashboard()">
+                <button class="btn-reset-range" onclick="resetDateRange()">ล้างช่วงวัน</button>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="stat-card cost">
+                <p id="cardCostTitle">รวมค่าไฟ</p>
+                <h4 id="dashTotalCost">0 บ.</h4>
+                <div class="stat-sub-detail">
+                    <span>🏠 บ้าน: <strong id="subCostHome">0</strong> บ.</span>
+                    <span>⚡ นอก: <strong id="subCostStation">0</strong> บ.</span>
+                </div>
+            </div>
+            <div class="stat-card unit">
+                <p id="cardUnitTitle">พลังงานรวม</p>
+                <h4 id="dashTotalUnit">0 น.</h4>
+                <div class="stat-sub-detail">
+                    <span>🏠 บ้าน: <strong id="subUnitHome">0</strong> น.</span>
+                    <span>⚡ นอก: <strong id="subUnitStation">0</strong> น.</span>
+                </div>
+            </div>
+            <div class="stat-card count">
+                <p id="cardCountTitle">จำนวนครั้ง</p>
+                <h4 id="dashTotalCount">0 ครั้ง</h4>
+                <div class="stat-sub-detail">
+                    <span>🏠 บ้าน: <strong id="subCountHome">0</strong> ครั้ง</span>
+                    <span>⚡ นอก: <strong id="subCountStation">0</strong> ครั้ง</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-section-header">
+            <div class="chart-header-left">
+                <h4 style="margin:0; color:#fff;" id="chartTitle">แนวโน้ม</h4>
+                <select id="chartMetricSelect" class="chart-metric-select" onchange="loadDashboard()">
+                    <option value="kwh">หน่วยไฟที่ใช้ (kWh)</option>
+                    <option value="cost">ค่าใช้จ่าย (บาท)</option>
+                    <option value="count">จำนวนการชาร์จ (ครั้ง)</option>
+                </select>
+            </div>
+            <div class="chart-controls">
+                <button class="btn-toggle-chart active" id="btn-monthly" onclick="changeChartPeriod('monthly')">เดือน</button>
+                <button class="btn-toggle-chart" id="btn-yearly" onclick="changeChartPeriod('yearly')">ปี</button>
+            </div>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="energyLineChart"></canvas>
+        </div>
+
+        <div class="history-header-area">
+            <h3 style="margin:0;">📋 ประวัติการชาร์จ</h3>
+            <div class="filter-group-header">
+                <select id="historyFilterYear" onchange="loadDashboard()"></select>
+                <select id="historyFilterMonth" onchange="loadDashboard()">
+                    <option value="all">แสดงทุกเดือน</option>
+                    <option value="1">มกราคม</option>
+                    <option value="2">กุมภาพันธ์</option>
+                    <option value="3">มีนาคม</option>
+                    <option value="4">เมษายน</option>
+                    <option value="5">พฤษภาคม</option>
+                    <option value="6">มิถุนายน</option>
+                    <option value="7">กรกฎาคม</option>
+                    <option value="8">สิงหาคม</option>
+                    <option value="9">กันยายน</option>
+                    <option value="10">ตุลาคม</option>
+                    <option value="11">พฤศจิกายน</option>
+                    <option value="12">ธันวาคม</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>วันที่ชาร์จ</th>
+                        <th>การชาร์จ</th>
+                        <th>เลขไมล์(กม.)</th>
+                        <th>ระยะวิ่งจริง</th>
+                        <th>พลังงาน</th>
+                        <th>ค่าไฟ</th>
+                        <th>เฉลี่ย(บาท/กม.)</th>
+                        <th style="text-align:center;">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal แก้ไขข้อมูล -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-card">
+        <h3>✏️ แก้ไขข้อมูลการชาร์จ</h3>
+        <input type="hidden" id="editId">
+        <div class="form-group">
+            <label for="editDate">วันที่ชาร์จ:</label>
+            <input type="date" id="editDate" required>
+        </div>
+        <div class="form-group">
+            <label for="editOdometer">เลขไมล์ปัจจุบัน (กม.):</label>
+            <input type="number" id="editOdometer" placeholder="เช่น 12500" min="0" required>
+        </div>
+        <div class="form-group">
+            <label for="editLocation">สถานที่ชาร์จ:</label>
+            <select id="editLocation" onchange="toggleEditLocationFields()">
+                <option value="home">🏠 ชาร์จที่บ้าน (Home TOU)</option>
+                <option value="station">⚡ ชาร์จนอกบ้าน / สถานีชาร์จ</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="editBattery">ปริมาณไฟ (kWh):</label>
+            <input type="text" inputmode="decimal" id="editBattery" placeholder="เช่น 30 หรือ 7.19+20.16" required>
+        </div>
+        
+        <div id="editHomeBox">
+            <div class="form-group">
+                <label for="editPeriod">ช่วงเวลาชาร์จ (อัตรา กฟภ.):</label>
+                <select id="editPeriod">
+                    <option value="2.6369">Off-Peak (2.6369 บาท/หน่วย)</option>
+                    <option value="5.7982">On-Peak (5.7982 บาท/หน่วย)</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="editStationBox" style="display:none;">
+            <div class="form-group">
+                <label for="editStationRate">ราคาต่อหน่วยตู้ชาร์จ (บาท/kWh):</label>
+                <input type="number" id="editStationRate" placeholder="เช่น 7.5" step="0.01" min="0">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-save" id="btnUpdate" onclick="updateRecord()">อัปเดต</button>
+            <button style="background-color:#30363d;" onclick="closeModal()">ยกเลิก</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal ตารางบำรุงรักษา -->
+<div class="modal-overlay" id="maintModal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="margin:0;">🚗 ตารางบำรุงรักษา GEELY EX2</h3>
+            <button onclick="closeMaintModal()" style="background:transparent; border:none; color:#8b949e; font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:0.8rem; color:#8b949e; margin-top:0;">ตารางแสดงรายการเปลี่ยนอะไหล่และประมาณการค่าบริการตามระยะทาง (ไม่รวม VAT)</p>
+        
+        <div class="table-container" style="max-height:350px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ระยะทาง (กม.) / เดือน</th>
+                        <th>รายการเปลี่ยนอะไหล่หลัก</th>
+                        <th>ค่าแรง+อะไหล่ (บาท)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>5,000 กม.</strong> (3 เดือน)</td>
+                        <td>ตรวจเช็กระบบทั่วไป 19 รายการ</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">650 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>20,000 กม.</strong> (12 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์ (A/C Filter)</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">1,450 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>40,000 กม.</strong> (24 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์, น้ำมันเบรก (Brake Fluid)</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">2,630 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>60,000 กม.</strong> (36 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">1,450 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>80,000 กม.</strong> (48 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์, น้ำมันเบรก, น้ำมันชุดเฟืองมอเตอร์, น้ำยาหล่อเย็น</td>
+                        <td style="color:var(--warning-neon); font-weight:bold;">6,925 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>100,000 กม.</strong> (60 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">1,450 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>120,000 กม.</strong> (72 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์, น้ำมันเบรก</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">2,630 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>140,000 กม.</strong> (84 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์, ตรวจสอบแบตเตอรี่ HV</td>
+                        <td style="color:var(--secondary-neon); font-weight:bold;">1,775 บ.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>160,000 กม.</strong> (96 เดือน)</td>
+                        <td>เปลี่ยนไส้กรองแอร์, น้ำมันเบรก, น้ำมันชุดเฟืองมอเตอร์, น้ำยาหล่อเย็น</td>
+                        <td style="color:var(--warning-neon); font-weight:bold;">6,925 บ.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin: 12px 0; padding: 10px; background-color: var(--input-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+            <span style="font-size: 0.8rem; color: #8b949e; display: block; margin-bottom: 4px;">📌 ข้อมูลอ้างอิงจากศูนย์บริการทางการ:</span>
+            <a href="http://www.thonburineustern.com/service/maintenance/" target="_blank" class="ref-link">
+                🔗 thonburineustern.com/service/maintenance ↗
+            </a>
+        </div>
+
+        <p style="font-size:0.75rem; color:#8b949e; margin-bottom:15px;">* หมายเหตุ: อัตราค่าแรงมาตรฐาน 650 บาท/ชม. (ข้อมูล ณ วันที่ 28 พ.ย. 2568)</p>
+        <button style="width:100%; background-color:#30363d;" onclick="closeMaintModal()">ปิดหน้าต่าง</button>
+    </div>
+</div>
+
+<!-- Modal ปฏิทิน Off-Peak -->
+<div class="modal-overlay" id="calModal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="margin:0;">📅 ปฏิทินวัน Off-Peak PEA 2569</h3>
+            <button onclick="closeCalModal()" style="background:transparent; border:none; color:#8b949e; font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:0.82rem; color:#8b949e; margin-top:0;">ตารางวันหยุดและช่วงเวลา Off-Peak (อัตราประหยัด) ตามประกาศ กฟภ. ปี 2569</p>
+        
+        <div style="width:100%; border-radius:8px; overflow:hidden; border:1px solid var(--border-color); background-color:#fff; text-align:center;">
+            <img src="Off-Peak_Calendar_2569_0.jpg" alt="ปฏิทินวัน Off Peak อัตรา TOU 2569 PEA" style="width:100%; height:auto; display:block;" onerror="this.alt='กรุณาวางไฟล์ Off-Peak_Calendar_2569_0.jpg ในโฟลเดอร์เดียวกัน'">
+        </div>
+
+        <div style="margin-top: 12px; padding: 10px; background-color: var(--input-bg); border-radius: 8px; font-size:0.8rem; color:#c9d1d9; text-align:left;">
+            <strong>📌 สรุปช่วงเวลา Off-Peak (2.6369 บาท/หน่วย):</strong>
+            <ul style="margin: 5px 0 0 0; padding-left: 18px; color:#8b949e;">
+                <li>จันทร์ - ศุกร์: เวลา 22.00 น. - 09.00 น.</li>
+                <li>เสาร์ - อาทิตย์ และวันหยุดราชการตามปกติ: ตลอด 24 ชั่วโมง</li>
+                <li><strong style="color:var(--danger);">* วันหยุดชดเชยทุกกรณี:</strong> คิดเป็น On-Peak ปกติ</li>
+            </ul>
+        </div>
+        
+        <button style="width:100%; background-color:#30363d; margin-top:12px;" onclick="closeCalModal()">ปิดหน้าต่าง</button>
+    </div>
+</div>
+
+<script>
+    const GOOGLE_SHEET_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxa81ssvxkvW-K6GYCtBJ8aX6jMyr2deI2Wugwo7xONvZgGAXGw9-OtwsF3a_Kf8tl2/exec";
+
+    const AUTH_USER = "admin";
+    const AUTH_PASS = "auto1555";
+
+    let cachedSheetRecords = []; 
+    const EX2_MAINT_INTERVALS = [5000, 20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000];
+
+    // 🧮 แปลงข้อความที่มีเครื่องหมาย "+" เป็นผลรวมตัวเลข (เช่น "7.19+20.16" -> 27.35)
+    function parseBatteryInput(rawStr) {
+        if (!rawStr) return 0;
+        const parts = String(rawStr).split('+');
+        let sum = 0;
+        for (let part of parts) {
+            const num = parseFloat(part.trim());
+            if (!isNaN(num) && num > 0) {
+                sum += num;
+            }
+        }
+        return sum;
+    }
+
+    function toggleLocationFields() {
+        const loc = document.getElementById('chargeLocation').value;
+        if (loc === 'home') {
+            document.getElementById('homeRateBox').style.display = 'block';
+            document.getElementById('stationRateBox').style.display = 'none';
+        } else {
+            document.getElementById('homeRateBox').style.display = 'none';
+            document.getElementById('stationRateBox').style.display = 'block';
+        }
+        calculateEnergy();
+    }
+
+    function toggleEditLocationFields() {
+        const loc = document.getElementById('editLocation').value;
+        if (loc === 'home') {
+            document.getElementById('editHomeBox').style.display = 'block';
+            document.getElementById('editStationBox').style.display = 'none';
+        } else {
+            document.getElementById('editHomeBox').style.display = 'none';
+            document.getElementById('editStationBox').style.display = 'block';
+        }
+    }
+
+    function loadCachedRecords() {
+        const localData = localStorage.getItem('ev_chargetracker_cache');
+        if (localData) {
+            try {
+                cachedSheetRecords = JSON.parse(localData);
+                loadDashboard();
+            } catch(e) { console.error("Cache Error", e); }
+        }
+    }
+
+    function checkAuthSession() {
+        const isLogged = localStorage.getItem('ev_dashboard_authenticated');
+        if (isLogged === 'true') {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainLayout').style.display = window.innerWidth >= 950 ? 'grid' : 'flex';
+            loadCachedRecords();
+            fetchRecordsFromSheet();
+        } else {
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('mainLayout').style.display = 'none';
+        }
+    }
+
+    function handleLogin() {
+        const userIn = document.getElementById('loginUser').value.trim();
+        const passIn = document.getElementById('loginPass').value.trim();
+        const errBox = document.getElementById('loginError');
+
+        if (userIn === AUTH_USER && passIn === AUTH_PASS) {
+            localStorage.setItem('ev_dashboard_authenticated', 'true');
+            errBox.style.display = 'none';
+            checkAuthSession();
+        } else {
+            errBox.style.display = 'block';
+        }
+    }
+
+    function handleLogout() {
+        if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
+            localStorage.removeItem('ev_dashboard_authenticated');
+            checkAuthSession();
+        }
+    }
+
+    function openMaintModal() { document.getElementById('maintModal').style.display = 'flex'; }
+    function closeMaintModal() { document.getElementById('maintModal').style.display = 'none'; }
+
+    function openCalModal() { document.getElementById('calModal').style.display = 'flex'; }
+    function closeCalModal() { document.getElementById('calModal').style.display = 'none'; }
+
+    let tempCalculated = null;
+    let energyChart = null;
+    let currentChartMode = 'monthly'; 
+
+    const today = new Date();
+    const localDateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    document.getElementById('date').value = localDateStr;
+
+    const currentSysMonthStr = String(today.getMonth() + 1);
+
+    const filterYearSelect = document.getElementById('filterYear');
+    for(let i = today.getFullYear() - 2; i <= today.getFullYear() + 2; i++) {
+        let opt = document.createElement('option');
+        opt.value = i; opt.innerHTML = "ปี พ.ศ. " + (i + 543);
+        if(i === today.getFullYear()) opt.selected = true;
+        filterYearSelect.appendChild(opt);
+    }
+    document.getElementById('filterMonth').value = currentSysMonthStr;
+
+    const historyFilterYearSelect = document.getElementById('historyFilterYear');
+    for(let i = today.getFullYear() - 2; i <= today.getFullYear() + 2; i++) {
+        let opt = document.createElement('option');
+        opt.value = i; opt.innerHTML = "ปี พ.ศ. " + (i + 543);
+        if(i === today.getFullYear()) opt.selected = true;
+        historyFilterYearSelect.appendChild(opt);
+    }
+    document.getElementById('historyFilterMonth').value = currentSysMonthStr;
+
+    const thaiMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    const thaiShortMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+    function formatThaiDate(dateStr) {
+        if (!dateStr) return '';
+        const cleanStr = String(dateStr).replace("'", "").trim();
+        const parts = cleanStr.split('-');
+        if (parts.length !== 3) return cleanStr;
+        return `${parseInt(parts[2])} ${thaiShortMonths[parseInt(parts[1])-1]} ${String(parseInt(parts[0]) + 543).substring(2)}`;
+    }
+
+    function getMonthLabelArray() { return window.innerWidth < 600 ? thaiShortMonths : thaiMonths; }
+
+    function calculateEnergy() {
+        const rawBattery = document.getElementById('battery').value;
+        const batteryInput = parseBatteryInput(rawBattery);
+        const odoInput = parseFloat(document.getElementById('odometer').value);
+        const locationType = document.getElementById('chargeLocation').value;
+
+        if (!batteryInput || batteryInput <= 0) {
+            document.getElementById('resultBox').style.display = 'none';
+            return null;
+        }
+
+        let actualKwh = batteryInput;
+        let totalCost = 0;
+        let rateLabel = "";
+        let rateUnitVal = 0;
+
+        if (locationType === 'home') {
+            const baseRate = parseFloat(document.getElementById('period').value);
+            totalCost = actualKwh * (baseRate + 0.1623) * 1.07;
+            const isOffPeak = Math.abs(baseRate - 2.6369) < 0.1;
+            rateLabel = isOffPeak ? 'Off-Peak' : 'On-Peak';
+            rateUnitVal = baseRate;
+        } else {
+            const stationRate = parseFloat(document.getElementById('stationUnitRate').value) || 0;
+            totalCost = actualKwh * stationRate;
+            rateLabel = 'สถานีชาร์จ';
+            rateUnitVal = stationRate;
+        }
+
+        let prevOdometer = 0;
+        if (cachedSheetRecords.length > 0) {
+            const sortedByOdo = [...cachedSheetRecords].filter(r => r.odometer > 0).sort((a, b) => b.odometer - a.odometer);
+            if (sortedByOdo.length > 0) prevOdometer = sortedByOdo[0].odometer;
+        }
+
+        let distance = 0;
+        let infoDistanceStr = "-";
+        let costPerKmStr = "-";
+
+        if (odoInput && prevOdometer > 0) {
+            if (odoInput > prevOdometer) {
+                distance = odoInput - prevOdometer;
+                infoDistanceStr = `${distance.toLocaleString('th-TH')} กม. (จากครั้งก่อน ${prevOdometer.toLocaleString('th-TH')} กม.)`;
+                const costPerKm = totalCost / distance;
+                costPerKmStr = `${costPerKm.toFixed(2)} บาท/กม. (${(distance / actualKwh).toFixed(1)} กม./kWh)`;
+            } else {
+                infoDistanceStr = `⚠️ เลขไมล์น้อยกว่าหรือเท่ากับครั้งก่อน (${prevOdometer.toLocaleString('th-TH')} กม.)`;
+            }
+        } else if (odoInput && prevOdometer === 0) {
+            infoDistanceStr = `ตั้งต้นที่ ${odoInput.toLocaleString('th-TH')} กม.`;
+            costPerKmStr = "บันทึกครั้งแรก";
+        }
+
+        const hasPlus = String(rawBattery).includes('+');
+        document.getElementById('resUnit').innerText = actualKwh.toFixed(2) + ' kWh' + (hasPlus ? ` (รวมจาก ${rawBattery.trim()})` : '');
+        document.getElementById('resTotal').innerText = totalCost.toFixed(2);
+        document.getElementById('resDistance').innerText = infoDistanceStr;
+        document.getElementById('resCostPerKm').innerText = costPerKmStr;
+        document.getElementById('resultBox').style.display = 'block';
+
+        tempCalculated = { 
+            kwh: actualKwh, 
+            cost: totalCost, 
+            odometer: odoInput || 0,
+            rateText: rateLabel,
+            unitRate: rateUnitVal
+        };
+        return tempCalculated;
+    }
+
+    async function saveRecord() {
+        const calcData = tempCalculated || calculateEnergy();
+        if(!calcData) return;
+        const dateVal = document.getElementById('date').value;
+        if(!dateVal) { alert('กรุณาระบุวันที่ชาร์จไฟด้วยครับ'); return; }
+
+        const btnSave = document.getElementById('btnSave');
+        btnSave.disabled = true; btnSave.innerText = "กำลังบันทึก...";
+
+        if (GOOGLE_SHEET_WEB_APP_URL && GOOGLE_SHEET_WEB_APP_URL !== "วาง_WEB_APP_URL_ตรงนี้") {
+            try {
+                await fetch(GOOGLE_SHEET_WEB_APP_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'add', id: Date.now(), date: dateVal,
+                        type: calcData.rateText, kwh: calcData.kwh.toFixed(2), 
+                        cost: calcData.cost.toFixed(2), odometer: calcData.odometer,
+                        unitRate: calcData.unitRate
+                    })
+                });
+                alert('บันทึกข้อมูลเรียบร้อยแล้ว!');
+            } catch (err) { console.error("Sheet Error:", err); }
+        }
+
+        btnSave.disabled = false; btnSave.innerText = "บันทึกผล";
+        tempCalculated = null;
+        document.getElementById('battery').value = '';
+        document.getElementById('odometer').value = '';
+        document.getElementById('stationUnitRate').value = '';
+        document.getElementById('resultBox').style.display = 'none';
+        await fetchRecordsFromSheet();
+    }
+
+    async function deleteRecord(id) {
+        if (!confirm('คุณแน่ใจว่าต้องการลบรายการชาร์จนี้?')) return;
+        const syncStatus = document.getElementById('syncStatus');
+        syncStatus.innerText = "⏳ กำลังลบ...";
+
+        if (GOOGLE_SHEET_WEB_APP_URL && GOOGLE_SHEET_WEB_APP_URL !== "วาง_WEB_APP_URL_ตรงนี้") {
+            try {
+                await fetch(GOOGLE_SHEET_WEB_APP_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete', id: id })
+                });
+                alert('ลบข้อมูลเรียบร้อยแล้ว');
+                await fetchRecordsFromSheet();
+            } catch (err) { alert('ลบข้อมูลไม่สำเร็จ'); }
+        }
+    }
+
+    function openEditModal(id) {
+        const item = cachedSheetRecords.find(r => String(r.id) === String(id));
+        if (!item) return;
+
+        document.getElementById('editId').value = item.id;
+        document.getElementById('editDate').value = item.date;
+        document.getElementById('editOdometer').value = item.odometer || '';
+
+        const isStation = item.type === 'สถานีชาร์จ' || item.type.includes('สถานี');
+        document.getElementById('editLocation').value = isStation ? 'station' : 'home';
+        toggleEditLocationFields();
+
+        if (isStation) {
+            document.getElementById('editBattery').value = item.kwh.toFixed(2);
+            document.getElementById('editStationRate').value = item.unitRate || '';
+        } else {
+            document.getElementById('editBattery').value = item.kwh.toFixed(2);
+            document.getElementById('editPeriod').value = item.type === 'Off-Peak' ? "2.6369" : "5.7982";
+        }
+
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('editModal').style.display = 'none'; }
+
+    async function updateRecord() {
+        const id = document.getElementById('editId').value;
+        const dateVal = document.getElementById('editDate').value;
+        const odoInput = parseFloat(document.getElementById('editOdometer').value) || 0;
+        const batteryInput = parseBatteryInput(document.getElementById('editBattery').value);
+        const locationType = document.getElementById('editLocation').value;
+
+        if (!batteryInput || batteryInput <= 0 || !dateVal) {
+            alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return;
+        }
+
+        let actualKwh = batteryInput;
+        let totalCost = 0;
+        let rateLabel = "";
+        let rateUnitVal = 0;
+
+        if (locationType === 'home') {
+            const baseRate = parseFloat(document.getElementById('editPeriod').value);
+            totalCost = actualKwh * (baseRate + 0.1623) * 1.07;
+            const isOffPeak = Math.abs(baseRate - 2.6369) < 0.1;
+            rateLabel = isOffPeak ? 'Off-Peak' : 'On-Peak';
+            rateUnitVal = baseRate;
+        } else {
+            const stationRate = parseFloat(document.getElementById('editStationRate').value) || 0;
+            totalCost = batteryInput * stationRate;
+            rateLabel = 'สถานีชาร์จ';
+            rateUnitVal = stationRate;
+        }
+
+        const btnUpdate = document.getElementById('btnUpdate');
+        btnUpdate.disabled = true; btnUpdate.innerText = "กำลังอัปเดต...";
+
+        if (GOOGLE_SHEET_WEB_APP_URL && GOOGLE_SHEET_WEB_APP_URL !== "วาง_WEB_APP_URL_ตรงนี้") {
+            try {
+                await fetch(GOOGLE_SHEET_WEB_APP_URL, {
+                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'edit', id: id, date: dateVal, type: rateLabel,
+                        kwh: actualKwh.toFixed(2), cost: totalCost.toFixed(2), odometer: odoInput,
+                        unitRate: rateUnitVal
+                    })
+                });
+                alert('อัปเดตข้อมูลเรียบร้อยแล้ว!');
+                closeModal();
+                await fetchRecordsFromSheet();
+            } catch (err) { alert('อัปเดตข้อมูลไม่สำเร็จ'); }
+        }
+        btnUpdate.disabled = false; btnUpdate.innerText = "อัปเดต";
+    }
+
+    async function fetchRecordsFromSheet() {
+        const syncStatus = document.getElementById('syncStatus');
+        if (!GOOGLE_SHEET_WEB_APP_URL || GOOGLE_SHEET_WEB_APP_URL === "วาง_WEB_APP_URL_ตรงนี้") {
+            syncStatus.innerText = "(ยังไม่ได้ใส่ Sheet URL)"; return;
+        }
+
+        try {
+            syncStatus.innerText = "🔄 ซิงค์...";
+            const res = await fetch(GOOGLE_SHEET_WEB_APP_URL);
+            const data = await res.json();
+            
+            cachedSheetRecords = data.map(item => {
+                let cleanDate = String(item.date).replace("'", "").trim();
+                if (cleanDate.includes('T')) cleanDate = cleanDate.split('T')[0];
+                
+                return {
+                    id: item.id,
+                    date: cleanDate,
+                    type: item.type,
+                    kwh: parseFloat(item.kwh) || 0,
+                    cost: parseFloat(item.cost) || 0,
+                    odometer: parseFloat(item.odometer) || 0,
+                    unitRate: parseFloat(item.unitRate) || 0
+                };
+            });
+
+            localStorage.setItem('ev_chargetracker_cache', JSON.stringify(cachedSheetRecords));
+
+            syncStatus.innerText = "✓ สดใหม่";
+            setTimeout(() => { syncStatus.innerText = ""; }, 3000);
+            loadDashboard();
+        } catch(err) {
+            console.error("Fetch Sheet Error:", err);
+            syncStatus.innerText = "⚠️ ออฟไลน์";
+        }
+    }
+
+    function changeChartPeriod(mode) {
+        currentChartMode = mode;
+        document.querySelectorAll('.btn-toggle-chart').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${mode}`).classList.add('active');
+        loadDashboard();
+    }
+
+    function resetDateRange() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        loadDashboard();
+    }
+
+    function onDropdownFilterChange() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        loadDashboard();
+    }
+
+    function updateMaintenanceTracker(latestOdo) {
+        let currentKm = latestOdo || 0;
+        let nextTarget = EX2_MAINT_INTERVALS.find(target => target > currentKm) || 160000;
+        
+        let prevTarget = 0;
+        const targetIndex = EX2_MAINT_INTERVALS.indexOf(nextTarget);
+        if (targetIndex > 0) prevTarget = EX2_MAINT_INTERVALS[targetIndex - 1];
+
+        let remainKm = nextTarget - currentKm;
+        if (remainKm < 0) remainKm = 0;
+
+        let totalProgressRange = nextTarget - prevTarget;
+        let currentProgress = currentKm - prevTarget;
+        let progressPercent = Math.min(Math.max((currentProgress / totalProgressRange) * 100, 0), 100);
+
+        document.getElementById('maintNextKm').innerText = `รอบ ${nextTarget.toLocaleString('th-TH')} กม.`;
+        document.getElementById('maintCurrentKm').innerText = currentKm.toLocaleString('th-TH');
+        document.getElementById('maintRemainKm').innerText = remainKm.toLocaleString('th-TH');
+        document.getElementById('maintProgressBar').style.width = `${progressPercent}%`;
+    }
+
+    function loadDashboard() {
+        const selectedYear = document.getElementById('filterYear').value;
+        const selectedMonthFilter = document.getElementById('filterMonth').value; 
+        const histYear = document.getElementById('historyFilterYear').value;
+        const histMonth = document.getElementById('historyFilterMonth').value;
+        const selectedMetric = document.getElementById('chartMetricSelect').value;
+
+        const startDateVal = document.getElementById('startDate').value;
+        const endDateVal = document.getElementById('endDate').value;
+        const isCustomRange = startDateVal && endDateVal;
+
+        let records = [...cachedSheetRecords];
+        
+        records.sort((a, b) => {
+            if (a.odometer !== b.odometer) return a.odometer - b.odometer;
+            return a.id - b.id;
+        });
+
+        for (let i = 0; i < records.length; i++) {
+            if (i > 0 && records[i].odometer > records[i-1].odometer && records[i-1].odometer > 0) {
+                let dist = records[i].odometer - records[i-1].odometer;
+                records[i].distance = dist;
+                records[i].costPerKm = (records[i].cost / dist).toFixed(2);
+            } else {
+                records[i].distance = 0;
+                records[i].costPerKm = "-";
+            }
+        }
+
+        records.sort((a, b) => {
+            if (b.odometer !== a.odometer) return b.odometer - a.odometer;
+            return b.id - a.id;
+        });
+
+        const latestOdo = records.length > 0 ? (records[0].odometer || 0) : 0;
+        updateMaintenanceTracker(latestOdo);
+
+        let filteredCostSum = 0, filteredUnitSum = 0, filteredCount = 0;
+        let homeCost = 0, homeUnit = 0, homeCount = 0;
+        let stationCost = 0, stationUnit = 0, stationCount = 0;
+
+        let monthlyMap = {}, yearlyMap = {};
+        for(let m = 1; m <= 12; m++) monthlyMap[m] = 0;
+
+        let historyMatchedRecords = [];
+        let historyHTML = '';
+
+        records.forEach(rec => {
+            if (!rec.date) return;
+            const parts = rec.date.split('-');
+            if (parts.length !== 3) return;
+
+            const year = parts[0], month = parts[1];
+            const isStation = rec.type === 'สถานีชาร์จ' || rec.type.includes('สถานี');
+
+            let val = 0;
+            if (selectedMetric === 'kwh') val = rec.kwh;
+            else if (selectedMetric === 'cost') val = rec.cost;
+            else if (selectedMetric === 'count') val = 1;
+
+            const yKey = parseInt(year) + 543;
+            yearlyMap[yKey] = (yearlyMap[yKey] || 0) + val;
+
+            let isDashMatched = false;
+            if (isCustomRange) {
+                if (rec.date >= startDateVal && rec.date <= endDateVal) isDashMatched = true;
+            } else if (year === selectedYear) {
+                if (selectedMonthFilter === 'all' || parseInt(month) === parseInt(selectedMonthFilter)) isDashMatched = true;
+            }
+
+            if (isDashMatched) {
+                filteredCostSum += rec.cost;
+                filteredUnitSum += rec.kwh;
+                filteredCount++;
+
+                if (isStation) {
+                    stationCost += rec.cost;
+                    stationUnit += rec.kwh;
+                    stationCount++;
+                } else {
+                    homeCost += rec.cost;
+                    homeUnit += rec.kwh;
+                    homeCount++;
+                }
+            }
+
+            if (year === histYear) {
+                if (histMonth === 'all' || parseInt(month) === parseInt(histMonth)) {
+                    historyMatchedRecords.push(rec);
+                }
+            }
+
+            if (year === selectedYear) {
+                const mIdx = parseInt(month);
+                monthlyMap[mIdx] += val;
+            }
+        });
+
+        if (historyMatchedRecords.length === 0) {
+            historyHTML = `<tr><td colspan="8" style="text-align:center; color:#8b949e;">ไม่มีประวัติการชาร์จตรงตามเงื่อนไขที่เลือก</td></tr>`;
+        } else {
+            let currentGroupKey = "";
+
+            historyMatchedRecords.forEach(rec => {
+                const parts = rec.date.split('-');
+                const groupKey = `${parts[0]}-${parts[1]}`;
+
+                if (groupKey !== currentGroupKey) {
+                    currentGroupKey = groupKey;
+                    const monthName = thaiMonths[parseInt(parts[1]) - 1];
+                    const yearBE = parseInt(parts[0]) + 543;
+                    const monthTotalCost = historyMatchedRecords
+                        .filter(r => r.date.startsWith(groupKey))
+                        .reduce((sum, r) => sum + r.cost, 0);
+
+                    historyHTML += `<tr class="month-header-row">
+                        <td colspan="8">
+                            📅 เดือน ${monthName} ${yearBE} 
+                            <span style="float:right; font-weight:normal; font-size:0.8rem; color:var(--text-color);">
+                                ยอดรวม: <strong style="color:var(--secondary-neon);">${monthTotalCost.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> บาท
+                            </span>
+                        </td>
+                    </tr>`;
+                }
+
+                const isStation = rec.type === 'สถานีชาร์จ' || rec.type.includes('สถานี');
+                let badgeTypeHtml = "";
+                if (isStation) {
+                    badgeTypeHtml = `<span style="color:var(--station-neon);">⚡ สถานี</span>`;
+                } else {
+                    let displayType = rec.type === 'Off-Peak' || rec.type === 'Off' ? 'Off-Peak' : 'On-Peak';
+                    badgeTypeHtml = `<span style="color:${displayType === 'Off-Peak' ? 'var(--secondary-neon)' : 'var(--danger)'}">🏠 ${displayType}</span>`;
+                }
+
+                let odoText = rec.odometer > 0 ? rec.odometer.toLocaleString('th-TH') : '-';
+                let distText = rec.distance > 0 ? `${rec.distance.toLocaleString('th-TH')} กม.` : '-';
+                let costPerKmDisplay = rec.costPerKm !== "-" ? `<span class="cost-per-km-badge">${rec.costPerKm} บ./กม.</span>` : '-';
+
+                historyHTML += `<tr>
+                    <td style="padding-left: 15px;">${formatThaiDate(rec.date)}</td>
+                    <td>${badgeTypeHtml}</td>
+                    <td>${odoText}</td>
+                    <td>${distText}</td>
+                    <td>${rec.kwh.toFixed(1)} kWh</td>
+                    <td style="color:#fff; font-weight:600;">${rec.cost.toFixed(1)}</td>
+                    <td>${costPerKmDisplay}</td>
+                    <td style="text-align:center;">
+                        <div class="action-btn-group">
+                            <button class="btn-action-edit" onclick="openEditModal(${rec.id})">แก้ไข</button>
+                            <button class="btn-action-delete" onclick="deleteRecord(${rec.id})">ลบ</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        document.getElementById('historyTableBody').innerHTML = historyHTML;
+
+        if (isCustomRange) {
+            const startLabel = formatThaiDate(startDateVal), endLabel = formatThaiDate(endDateVal);
+            document.getElementById('cardCostTitle').innerText = `ค่าไฟ (${startLabel} - ${endLabel})`;
+            document.getElementById('cardUnitTitle').innerText = `พลังงานช่วงที่เลือก`;
+            document.getElementById('cardCountTitle').innerText = `ชาร์จช่วงที่เลือก`;
+        } else if(selectedMonthFilter === 'all') {
+            document.getElementById('cardCostTitle').innerText = "รวมค่าไฟทั้งปี";
+            document.getElementById('cardUnitTitle').innerText = "พลังงานทั้งปี";
+            document.getElementById('cardCountTitle').innerText = "จำนวนครั้งทั้งปี";
+        } else {
+            const mName = thaiShortMonths[parseInt(selectedMonthFilter)-1];
+            document.getElementById('cardCostTitle').innerText = `ค่าไฟเดือน ${mName}`;
+            document.getElementById('cardUnitTitle').innerText = `พลังงานเดือน ${mName}`;
+            document.getElementById('cardCountTitle').innerText = `ชาร์จเดือน ${mName}`;
+        }
+
+        document.getElementById('dashTotalCost').innerText = filteredCostSum.toLocaleString('th-TH', {maximumFractionDigits: 0}) + ' ฿';
+        document.getElementById('dashTotalUnit').innerText = filteredUnitSum.toLocaleString('th-TH', {maximumFractionDigits: 0}) + ' น.';
+        document.getElementById('dashTotalCount').innerText = filteredCount + ' 🔌';
+
+        document.getElementById('subCostHome').innerText = homeCost.toLocaleString('th-TH', {maximumFractionDigits: 0});
+        document.getElementById('subCostStation').innerText = stationCost.toLocaleString('th-TH', {maximumFractionDigits: 0});
+
+        document.getElementById('subUnitHome').innerText = homeUnit.toLocaleString('th-TH', {maximumFractionDigits: 0});
+        document.getElementById('subUnitStation').innerText = stationUnit.toLocaleString('th-TH', {maximumFractionDigits: 0});
+
+        document.getElementById('subCountHome').innerText = homeCount;
+        document.getElementById('subCountStation').innerText = stationCount;
+
+        let chartLabels = [], chartData = [];
+        let metricLabel = "", metricColor = "#a370f7";
+
+        if (selectedMetric === 'kwh') { metricLabel = "พลังงานไฟฟ้า (kWh)"; metricColor = "#a370f7"; }
+        else if (selectedMetric === 'cost') { metricLabel = "ค่าใช้จ่าย (บาท)"; metricColor = "#00f2fe"; }
+        else if (selectedMetric === 'count') { metricLabel = "จำนวนครั้งการชาร์จ"; metricColor = "#ffdf80"; }
+
+        if (currentChartMode === 'monthly') {
+            chartLabels = getMonthLabelArray(); 
+            for(let m = 1; m <= 12; m++) chartData.push(monthlyMap[m]);
+        } else if (currentChartMode === 'yearly') {
+            chartLabels = Object.keys(yearlyMap).sort();
+            chartLabels.forEach(k => chartData.push(yearlyMap[k]));
+        }
+
+        if (energyChart) {
+            energyChart.data.labels = chartLabels;
+            energyChart.data.datasets[0].label = metricLabel;
+            energyChart.data.datasets[0].data = chartData;
+            energyChart.data.datasets[0].borderColor = metricColor;
+            energyChart.data.datasets[0].pointBackgroundColor = metricColor;
+            energyChart.update();
+        } else {
+            const ctx = document.getElementById('energyLineChart').getContext('2d');
+            energyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: metricLabel, data: chartData, borderColor: metricColor,
+                        backgroundColor: 'rgba(163, 112, 247, 0.08)', borderWidth: 2,
+                        pointBackgroundColor: metricColor, pointRadius: 3, tension: 0.3, fill: true
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }, 
+                    scales: {
+                        x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 } } },
+                        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 } }, beginAtZero: true }
+                    }
+                }
+            });
+        }
+    }
+
+    window.addEventListener('resize', () => {
+        if(energyChart && currentChartMode === 'monthly') {
+            energyChart.data.labels = getMonthLabelArray();
+            energyChart.update();
+        }
+    });
+
+    window.onload = checkAuthSession;
+</script>
+
+</body>
+</html>
